@@ -13,6 +13,96 @@ import gtk
 import urllib
 import xml.etree.ElementTree
 
+class PLSExporter():
+    def __init__(self,ple):
+        self.ple = ple
+    
+    def export(self):
+        f = open(self.ple.plpath, 'r')
+        lines = f.readlines()
+        
+        # Playlist title
+        values = lines[1].split("=")
+        self.ple.plname = values[1].rstrip('\n')
+        self.ple.noftracks = int(lines[2].rstrip('\n'))
+
+        self.ple.prepare_export()
+        
+        for i in range(1, self.ple.noftracks+1):
+            #Prepare and execute command
+            trackuri,trackname = self.get_content(lines[2*i+1],lines[2*i+2])
+            
+            self.ple.copy_command(i, trackuri, trackname)
+            
+        #set progress bar text like finished
+        self.ple.interface.progressbar.set_text("Finished!")
+                
+    def get_content(self,line1,line2):
+        values = line1.split("=")
+        uri = values[1].content.replace("file://",'')
+        uri = uri.rstrip('\n')
+        values = line2.split("=")
+        title = values[1].rstrip('\n')
+        return uri,title
+
+class M3UExporter():
+    def __init__(self,ple):
+        self.ple = ple
+    
+    def export(self):
+        f = open(self.ple.plpath, 'r')
+        lines = f.readlines()
+        self.ple.noftracks = (len(lines)-1)/2
+        
+        self.ple.prepare_export()
+        
+        for i in range(1, self.ple.noftracks+1):
+            #Prepare and execute command
+            trackuri,trackname = self.get_content(lines[2*i-1],lines[2*i])
+            
+            self.ple.copy_command(i, trackuri, trackname)
+            
+        #set progress bar text like finished
+        self.ple.interface.progressbar.set_text("Finished!")
+                
+    def get_content(self,line1,line2):
+        title = line1.replace("#EXTINF:,",'')
+        title = title.rstrip('\n')
+        uri = line2.rstrip('\n')
+        return uri,title
+
+class XSPFExporter():
+    def __init__(self,ple):
+        self.ple = ple
+    
+    def export(self):
+        f = open(self.ple.plpath, 'r')
+        lines = f.readlines()
+        
+        # Playlist title
+        self.ple.plname = self.get_content(lines[1])
+        self.ple.noftracks = int(self.get_content(lines[2]))
+
+        self.ple.prepare_export()
+        
+        for i in range(1, self.ple.noftracks+1):
+            #Prepare and execute command
+            trackuri = self.get_content(lines[2*i+1])
+            trackname = self.get_content(lines[2*i+2])
+            
+            self.ple.copy_command(i, trackuri, trackname)
+            
+        #set progress bar text like finished
+        self.ple.interface.progressbar.set_text("Finished!")
+                
+    def get_content(self,line):
+        values = line.split("=")
+        content = values[1]
+        content = content.rstrip('\n')
+        content = content.replace("file://",'')
+        content = urllib.unquote(content)
+        return content
+
 class PlaylistExporter():
     # path to the playlist file
     plpath = ""
@@ -27,8 +117,8 @@ class PlaylistExporter():
     expath = "~/PlaylistExporter"
     
     def __init__(self, file, expath,interface):
-        self.plpath = file.replace("file://",'')
-        self.expath = expath.replace("file://",'')
+        self.plpath = file
+        self.expath = expath
         filebasename = os.path.basename(file)
         self.plname,self.extension = os.path.splitext(filebasename)
         self.interface = interface
@@ -36,58 +126,23 @@ class PlaylistExporter():
     def export(self):
         
         if(self.extension=='.pls'):
-            self.export_pls()
+            exporter = PLSExporter(self)
         elif(self.extension=='.m3u'):
-            self.export_m3u()
+            exporter = M3UExporter(self)
         elif(self.extension=='.xspf'):
-            self.export_xspf()
+            exporter = XSPFExporter(self)
         else:
-            self.export_defalut()
-        
-        
-    def export_xspf(self):
-        print ".xspf extension is being developed"
-        plet = etree.parse(self.plpath, parser=None, base_url=None)
-        trackList = plet.findall('track')
-        print trackList
-                
-    def export_pls(self):
-        f = open(self.plpath, 'r')
-        lines = f.readlines()
-        
-        # Playlist title
-        self.plname = self.getcontent(lines[1])
-        self.noftracks = int(self.getcontent(lines[2]))
-        
+            return
+        exporter.export()
+
+    def prepare_export(self):
         # zfill sais how much numbers has each song (1,01,001,0001...)
         self.zfill = len(str(self.noftracks))
         
+        #Make subdirectory if required
         if(self.interface.checkbox.get_active()):
             self.expath = self.expath+"/"+self.plname
             os.system("mkdir "+self.expath)
-        
-        for i in range(1, self.noftracks+1):
-            #Prepare and execute command
-            trackuri = self.getcontent(lines[2*i+1])
-            trackname = self.getcontent(lines[2*i+2])
-            
-            self.copy_command(i, trackuri, trackname)
-            
-        #set progress bar text like finished
-        self.interface.progressbar.set_text("Finished!")
-            
-    def export_m3u(self):
-        print ".m3u extension not supported yet"
-    def export_defalut(self):
-        print self.extension+" extension not supported"
-                
-    def getcontent(self,line):
-        values = line.split("=")
-        content = values[1]
-        content = content.rstrip('\n')
-        content = content.replace("file://",'')
-        content = urllib.unquote(content)
-        return content
     
     def copy_command(self,track,uri,name):
             #Change progress bar
@@ -184,10 +239,9 @@ class PlaylistInterface():
         gtk.main()
         
     def export(self,widget,data=None):
-        exporter = PlaylistExporter(self.plfcb.get_uri(),self.expfcb.get_uri(),self)
+        exporter = PlaylistExporter(self.plfcb.get_filename(),self.expfcb.get_filename(),self)
         self.progressbar.set_fraction(0.0)
         exporter.export()
-        
         
 if __name__ == '__main__':
     #doc1 = parse(open('document.xml'))
