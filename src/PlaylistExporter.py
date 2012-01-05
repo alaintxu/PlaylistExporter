@@ -112,13 +112,17 @@ class PlaylistInterface():
         filter.add_pattern("*.pls")
         filter.add_pattern("*.xspf")
         
-        self.plpath = arg
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.window.set_title("Playlist Exporter")
         self.window.set_default_size(512,215)
         
         self.vbox = gtk.VBox(False,5)
-        self.window.add(self.vbox)
+        
+        #Add padding
+        alignment = gtk.Alignment(xalign=0.0, yalign=0.0, xscale=1.0, yscale=1.0)
+        alignment.add(self.vbox)
+        alignment.set_padding(5,5,15,15)
+        self.window.add(alignment)
         
         hseparator0 = gtk.HSeparator()
         self.vbox.add(hseparator0)
@@ -131,9 +135,16 @@ class PlaylistInterface():
         self.plfcb = gtk.FileChooserButton("Browse")
         self.plfcb.set_title("Playlist file")
         self.plfcb.add_filter(filter)
-        print self.plfcb.set_uri("file://"+self.plpath)
+        if(arg!=None):
+            #Playlist as an argument
+            self.plpath = arg
+            self.plfcb.set_uri("file://"+self.plpath)
+        else:
+            #set HOME as default folder to find playlists
+            self.plfcb.set_current_folder(os.getenv("HOME"))
         self.vbox.add(self.plfcb)
         
+        #Visual separator
         hseparator1 = gtk.HSeparator()
         self.vbox.add(hseparator1)
         
@@ -157,13 +168,15 @@ class PlaylistInterface():
         #Button
         self.button = gtk.Button("Export files")
         self.button.connect("clicked",self.export,None)
-        self.button.set_size_request(80,30)
+        self.button.set_size_request(150,30)
         
         #Progress Bar
         self.progressbar = gtk.ProgressBar(adjustment=None)
         self.vbox.add(self.progressbar)
         
-        self.vbox.add(self.button)
+        alignment = gtk.Alignment(xalign=0.5, yalign=0.0, xscale=0.0, yscale=0.0)
+        alignment.add(self.button)
+        self.vbox.add(alignment)
         
         self.window.show_all()
     
@@ -191,9 +204,11 @@ if __name__ == '__main__':
             print __doc__
             sys.exit(0)
     # process arguments
-    for arg in args:
-        interface = PlaylistInterface(arg)
-        interface.main()
+    if(args.__len__()):
+        interface = PlaylistInterface(args[0])
+    else:
+        interface = PlaylistInterface(None)
+    interface.main()
     
     
         
