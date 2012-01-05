@@ -9,12 +9,9 @@ import sys
 import getopt
 import os
 from lxml import etree
-import pygtk
 import gtk
-import os
 import urllib
-from fractions import Fraction
-#import xml.etree.ElementTree
+import xml.etree.ElementTree
 
 class PlaylistExporter():
     # path to the playlist file
@@ -30,7 +27,7 @@ class PlaylistExporter():
     expath = "~/PlaylistExporter"
     
     def __init__(self, file, expath,interface):
-        self.plpath = file
+        self.plpath = file.replace("file://",'')
         self.expath = expath.replace("file://",'')
         filebasename = os.path.basename(file)
         self.plname,self.extension = os.path.splitext(filebasename)
@@ -60,23 +57,22 @@ class PlaylistExporter():
         
         # Playlist title
         self.plname = self.getcontent(lines[1])
-        trackcuantity = int(self.getcontent(lines[2]))
+        self.noftracks = int(self.getcontent(lines[2]))
+        
         # zfill sais how much numbers has each song (1,01,001,0001...)
-        zfill = len(str(trackcuantity))
+        self.zfill = len(str(self.noftracks))
         
-        for i in range(1, trackcuantity+1):
-            #Change progress bar
-            self.interface.progressbar.set_text(str(i)+" of "+str(trackcuantity))
-            self.interface.progressbar.set_fraction(float(i)/float(trackcuantity))
-            while gtk.events_pending():
-                gtk.main_iteration()
+        if(self.interface.checkbox.get_active()):
+            self.expath = self.expath+"/"+self.plname
+            os.system("mkdir "+self.expath)
+        
+        for i in range(1, self.noftracks+1):
             #Prepare and execute command
-            trackpath = self.getcontent(lines[2*i+1])
+            trackuri = self.getcontent(lines[2*i+1])
             trackname = self.getcontent(lines[2*i+2])
-            cpcommand = 'cp "'+trackpath+'" "'+self.expath+'/'+str(i).zfill(zfill)+' - '+trackname+'.mp3"'
-            print cpcommand
-            os.system(cpcommand)
-        
+            
+            self.copy_command(i, trackuri, trackname)
+            
         #set progress bar text like finished
         self.interface.progressbar.set_text("Finished!")
             
@@ -92,19 +88,30 @@ class PlaylistExporter():
         content = content.replace("file://",'')
         content = urllib.unquote(content)
         return content
+    
+    def copy_command(self,track,uri,name):
+            #Change progress bar
+            self.interface.progressbar.set_text(str(track)+" of "+str(self.noftracks))
+            self.interface.progressbar.set_fraction(float(track)/float(self.noftracks))
+            while gtk.events_pending():
+                gtk.main_iteration()
+            cpcommand = 'cp "'+uri+'" "'+self.expath+'/'+str(track).zfill(self.zfill)+' - '+name+'.mp3"'
+            print cpcommand
+            os.system(cpcommand)
+        
         
 class PlaylistInterface():
     # Playlists Path
     plpath = ""
     
-    # Supported file formats
-    filepattern = (
-                   ("PLS","*.pls"),
-                   ("XSPF","*.xspf"),
-                   ("All files","*.*")
-                   )
     
     def __init__(self,arg):
+        filter = gtk.FileFilter()
+        filter.set_name("Playlists")
+        filter.add_pattern("*.m3u")
+        filter.add_pattern("*.pls")
+        filter.add_pattern("*.xspf")
+        
         self.plpath = arg
         self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         self.window.set_title("Playlist Exporter")
@@ -115,39 +122,38 @@ class PlaylistInterface():
         
         hseparator0 = gtk.HSeparator()
         self.vbox.add(hseparator0)
-        #hseparator0.show()
         
         #Playlist label
         self.pllabel = gtk.Label("Playlist file")
         self.vbox.add(self.pllabel)
-        #self.pllabel.show()
         
         #Playlist file chooser button
         self.plfcb = gtk.FileChooserButton("Browse")
         self.plfcb.set_title("Playlist file")
+        self.plfcb.add_filter(filter)
         print self.plfcb.set_uri("file://"+self.plpath)
         self.vbox.add(self.plfcb)
-        #self.plfcb.show()
         
         hseparator1 = gtk.HSeparator()
         self.vbox.add(hseparator1)
-        #hseparator1.show()
         
         #Export folder label
         self.explabel = gtk.Label("Export folder")
         self.vbox.add(self.explabel)
-        #self.explabel.show()
         
+        #Export folder file chooser button
         self.expfcb = gtk.FileChooserButton("Browse")
         self.expfcb.set_title("Export folder")
         self.expfcb.set_action(gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER)
         self.expfcb.set_current_folder(os.getenv("HOME")+"/PlaylistExporter")
         self.vbox.add(self.expfcb)
-        #self.expfcb.show()
+        
+        self.checkbox = gtk.CheckButton("Create subfolder with playlist name", use_underline=True)
+        self.vbox.add(self.checkbox)
         
         hseparator2 = gtk.HSeparator()
         self.vbox.add(hseparator2)
-        #hseparator2.show()
+
         #Button
         self.button = gtk.Button("Export files")
         self.button.connect("clicked",self.export,None)
@@ -158,16 +164,14 @@ class PlaylistInterface():
         self.vbox.add(self.progressbar)
         
         self.vbox.add(self.button)
-        #self.button.show()
         
-        #self.vbox.show_all()
         self.window.show_all()
     
     def main(self):
         gtk.main()
         
     def export(self,widget,data=None):
-        exporter = PlaylistExporter(self.plpath,self.expfcb.get_uri(),self)
+        exporter = PlaylistExporter(self.plfcb.get_uri(),self.expfcb.get_uri(),self)
         self.progressbar.set_fraction(0.0)
         exporter.export()
         
