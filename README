@@ -1,0 +1,22 @@
+-------------------------------------------------------------------------------
+PlaylistExporter 0.1
+-------------------------------------------------------------------------------
+  Alain Perez Riaño <alain21p@hotmail.com>
+  http://alaintxu.blogspot.com
+
+DESCRIPTION
+
+  Program that exports playlist to a folder.
+
+INSTALL
+
+  You can use it just executing the ".py" file with python
+  
+    -OR-
+    
+  You can use it as a nautilus script copying the ".py" file to :
+    * ~/.gnome2/nautilus-scripts/
+
+LICENSE
+
+  PlaylistExporter is distributed under the GPL Version 2.

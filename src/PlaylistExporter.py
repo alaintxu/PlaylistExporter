@@ -2,17 +2,17 @@
 '''
 Created on Dec 20, 2011
 
-@author: alain
+@author: Alain Perez
 '''
 
 import sys
 import getopt
 import os
-from lxml import etree
+import xml.dom.minidom as MD
+from xml import etree
 import gtk
 import urllib
-import xml.etree.ElementTree
-
+import xml.etree.ElementTree as ET
 class PLSExporter():
     def __init__(self,ple):
         self.ple = ple
@@ -24,7 +24,8 @@ class PLSExporter():
         # Playlist title
         values = lines[1].split("=")
         self.ple.plname = values[1].rstrip('\n')
-        self.ple.noftracks = int(lines[2].rstrip('\n'))
+        values = lines[2].split("=")
+        self.ple.noftracks = int(values[1])
 
         self.ple.prepare_export()
         
@@ -39,8 +40,9 @@ class PLSExporter():
                 
     def get_content(self,line1,line2):
         values = line1.split("=")
-        uri = values[1].content.replace("file://",'')
+        uri = values[1].replace("file://",'')
         uri = uri.rstrip('\n')
+        uri = urllib.unquote(uri)
         values = line2.split("=")
         title = values[1].rstrip('\n')
         return uri,title
@@ -76,24 +78,36 @@ class XSPFExporter():
         self.ple = ple
     
     def export(self):
-        f = open(self.ple.plpath, 'r')
-        lines = f.readlines()
         
-        # Playlist title
-        self.ple.plname = self.get_content(lines[1])
-        self.ple.noftracks = int(self.get_content(lines[2]))
-
-        self.ple.prepare_export()
+        print ".xspf extension is being developed"
+        #print f.read()
+        '''dom = MD.parse(self.ple.plpath)
+        tracks = dom.getElementsByTagName('track')
+        self.ple.noftracks = len(tracks)
+        i=1
+        for track in tracks:
+            location = track.getElementsByTagName('location')[0]
+            trackname = track.getElementsByTagName('title')[0]
+            uri = track.getAttributeNodeNS('location')
+            title = track.getAttributeNodeNS('title')
+            print uri
+            print title
+            i = i+1'''
+        #print ET.tostring(f.read())
         
-        for i in range(1, self.ple.noftracks+1):
-            #Prepare and execute command
-            trackuri = self.get_content(lines[2*i+1])
-            trackname = self.get_content(lines[2*i+2])
-            
-            self.ple.copy_command(i, trackuri, trackname)
-            
         #set progress bar text like finished
         self.ple.interface.progressbar.set_text("Finished!")
+        
+        # Dialog
+        
+        dialog = gtk.MessageDialog(None,
+                               gtk.DIALOG_DESTROY_WITH_PARENT,
+                               gtk.MESSAGE_INFO,
+                               gtk.BUTTONS_OK,
+                               ".xspf extension support is not developed yet")
+        dialog.set_title("Unable to export list")
+        dialog.run()
+        dialog.destroy()
                 
     def get_content(self,line):
         values = line.split("=")
@@ -142,11 +156,11 @@ class PlaylistExporter():
         #Make subdirectory if required
         if(self.interface.checkbox.get_active()):
             self.expath = self.expath+"/"+self.plname
-            os.system("mkdir "+self.expath)
+            os.system('mkdir "'+self.expath+'"')
     
     def copy_command(self,track,uri,name):
             #Change progress bar
-            self.interface.progressbar.set_text(str(track)+" of "+str(self.noftracks))
+            self.interface.progressbar.set_text(name+" ("+str(track)+" of "+str(self.noftracks)+")")
             self.interface.progressbar.set_fraction(float(track)/float(self.noftracks))
             while gtk.events_pending():
                 gtk.main_iteration()
@@ -214,7 +228,9 @@ class PlaylistInterface():
         self.expfcb.set_current_folder(os.getenv("HOME")+"/PlaylistExporter")
         self.vbox.add(self.expfcb)
         
+        # Subfolder Checkbox
         self.checkbox = gtk.CheckButton("Create subfolder with playlist name", use_underline=True)
+        self.checkbox.set_active(True) # Checked by default
         self.vbox.add(self.checkbox)
         
         hseparator2 = gtk.HSeparator()
@@ -244,7 +260,7 @@ class PlaylistInterface():
         exporter.export()
         
 if __name__ == '__main__':
-    #doc1 = parse(open('document.xml'))
+
     # parse command line options
     try:
         opts, args = getopt.getopt(sys.argv[1:], "h", ["help"])
